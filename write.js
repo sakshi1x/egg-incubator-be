@@ -1,52 +1,30 @@
-const express = require('express');
-const app = express();
-const { Board, Led } = require('johnny-five');
+const SerialPort = require('serialport');
+const Readline = require('@serialport/parser-readline');
+const http = require('http');
+const socketIO = require('socket.io');
 
-// Create a new Johnny-Five board object
-const board = new Board();
+// Create a new HTTP server
+const server = http.createServer();
 
-const FAN_PIN = 2;
+// Create a new socket.io instance and attach it to the server
+const io = socketIO(server);
 
-// Initialize the board
-board.on('ready', () => {
-    const relay1 = new Relay(2);
-    const relay2 = new Relay(3);
-    const relay3 = new Relay(4);
-    const relay4 = new Relay(5);
-    const toggleRelay = (relay) => {
-        relay.toggle();
-        console.log(`Relay ${relay.pin} state: ${relay.isOn ? 'ON' : 'OFF'}`);
-    };
+// Define the serial port configuration
+const port = new SerialPort('COM3', { baudRate: 9600 }); // Replace 'COM3' with the appropriate port
 
-    // Example: Toggle relay 1 (connected to pin 2)
-    toggleRelay(relay1);
+// Create a parser to read data from the serial port
+const parser = port.pipe(new Readline({ delimiter: '\r\n' }));
 
-    // Example: Toggle relay 2 (connected to pin 3) after a delay of 2 seconds
-    setTimeout(() => {
-        toggleRelay(relay2);
-    }, 2000);
+// Event handler for receiving data from the Arduino
+parser.on('data', (data) => {
+    const [temperature, humidity] = data.split(' ');
 
-    // Example: Toggle relay 3 (connected to pin 4) after a delay of 4 seconds
-    setTimeout(() => {
-        toggleRelay(relay3);
-    }, 4000);
+    // Send only temperature and humidity to connected clients via socket.io
+    io.emit('sensorData', { temperature, humidity });
+});
 
-    // Example: Toggle relay 4 (connected to pin 5) after a delay of 6 seconds
-    setTimeout(() => {
-        toggleRelay(relay4);
-    }, 6000);
-    // Create a new LED object for the fan pin
-    const fan = new Led(FAN_PIN);
-
-    // API endpoint to control the fan
-    app.post('/fan', (req, res) => {
-        // Toggle the fan on/off
-        fan.toggle();
-        res.sendStatus(200);
-    });
-
-    // Start the server
-    app.listen(3001, () => {
-        console.log('Server is running on port 3000');
-    });
+// Start the server
+const portNumber = 3000; // Replace with the desired port number
+server.listen(portNumber, () => {
+    console.log(`Server is running on http://localhost:${portNumber}`);
 });

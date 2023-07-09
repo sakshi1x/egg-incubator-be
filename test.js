@@ -1,49 +1,24 @@
-const { Board, Relay } = require('johnny-five');
-const board = new Board();
+const SerialPort = require('serialport');
 
-const RELAY_PIN_1 = 2;
-const RELAY_PIN_2 = 3;
-const RELAY_PIN_3 = 4;
-const RELAY_PIN_4 = 5;
+// Specify the COM port and baud rate according to your NodeMCU configuration
+const port = new SerialPort('COM4', {
+    baudRate: 9600,
+});
 
-board.on('ready', () => {
-    const relay1 = new Relay(RELAY_PIN_1);
-    const relay2 = new Relay(RELAY_PIN_2);
-    const relay3 = new Relay(RELAY_PIN_3);
-    const relay4 = new Relay(RELAY_PIN_4);
+// Parse data received from the serial port
+port.on('data', function (data) {
+    const dataString = data.toString().trim();
 
-    const toggleRelay = (relay) => {
-        relay.toggle();
-        console.log(`Relay ${relay.pin} state: ${relay.isOn ? 'ON' : 'OFF'}`);
-    };
+    if (dataString.startsWith('Temperature:') && dataString.includes('Humidity:')) {
+        const temperature = parseFloat(dataString.split('Temperature:')[1].split('°C')[0].trim());
+        const humidity = parseFloat(dataString.split('Humidity:')[1].split('%')[0].trim());
 
-    const readline = require('readline');
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-    });
+        console.log('Temperature:', temperature, '°C');
+        console.log('Humidity:', humidity, '%');
+    }
+});
 
-    rl.on('line', (input) => {
-        processCommand(input);
-    });
-
-    const processCommand = (command) => {
-        switch (command) {
-            case '1':
-                toggleRelay(relay1);
-                break;
-            case '2':
-                toggleRelay(relay2);
-                break;
-            case '3':
-                toggleRelay(relay3);
-                break;
-            case '4':
-                toggleRelay(relay4);
-                break;
-            default:
-                console.log('Invalid command');
-                break;
-        }
-    };
+// Handle errors
+port.on('error', function (err) {
+    console.error('Serial port error:', err);
 });
